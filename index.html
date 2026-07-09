@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>Shelf Life Pro</title>
+<meta name="theme-color" content="#1F2422" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Shelf Life" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=IBM+Plex+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+  body { font-family: 'Inter', sans-serif; background:#EAE6DA; }
+  .font-display { font-family: 'Archivo', sans-serif; font-weight: 700; }
+  .font-mono { font-family: 'IBM Plex Mono', monospace; }
+  .row { display:flex; align-items:baseline; justify-content:space-between; padding:6px 0; border-bottom:1px dashed #D9D4C6; }
+  .row:last-child { border-bottom:none; }
+  .perf { display:flex; align-items:center; gap:6px; padding:8px 20px; background:#EAE6DA; }
+  .dot { width:3px; height:3px; border-radius:50%; background:#C6C0AF; flex-shrink:0; }
+  @media print {
+    .no-print { display: none !important; }
+    body { background: white !important; }
+  }
+</style>
+</head>
+<body>
+<div class="min-h-screen flex flex-col items-center py-10 px-4">
+  <div class="w-full max-w-[420px]">
+
+    <!-- Header -->
+    <div class="flex items-center justify-between mb-5 px-1 no-print">
+      <div>
+        <h1 class="font-display text-[22px] tracking-tight text-[#1F2422] leading-none">SHELF&nbsp;LIFE&nbsp;PRO</h1>
+        <p class="text-[11.5px] text-[#5B6660] mt-1">Batch freshness &amp; clearance tracker</p>
+      </div>
+      <div class="border-2 border-[#1F2422] rounded-full w-11 h-11 flex items-center justify-center rotate-[-8deg]">
+        <span class="font-mono text-[9px] font-bold text-[#1F2422]">QC</span>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="flex mb-4 border border-[#1F2422] no-print">
+      <button id="tab-calc-btn" class="flex-1 py-2.5 font-display text-[12px] uppercase tracking-wide bg-[#1F2422] text-[#EAE6DA]">Calculate</button>
+      <button id="tab-hist-btn" class="flex-1 py-2.5 font-display text-[12px] uppercase tracking-wide border-l border-[#1F2422] text-[#1F2422]">History <span id="hist-count"></span></button>
+    </div>
+
+    <!-- Calculate panel -->
+    <div id="calc-panel">
+      <div class="bg-white border border-[#D9D4C6] px-5 py-5 mb-4 no-print">
+        <label class="flex flex-col gap-1 mb-3">
+          <span class="text-[10px] tracking-[0.15em] uppercase font-semibold text-[#7C8B96] font-mono">Product Name / SKU (optional)</span>
+          <input id="input-name" type="text" placeholder="e.g. Milk 1L" class="text-[13px] border border-[#D9D4C6] px-2 py-2 text-[#1F2422] focus:outline-none focus:ring-2 focus:ring-[#3B5166] bg-[#F9F8F4]" />
+        </label>
+        <div class="grid grid-cols-2 gap-3 mb-3">
+          <label class="flex flex-col gap-1">
+            <span class="text-[10px] tracking-[0.15em] uppercase font-semibold text-[#7C8B96] font-mono">MFG Date</span>
+            <input id="input-mfg" type="date" class="font-mono text-[13px] border border-[#D9D4C6] px-2 py-2 text-[#1F2422] focus:outline-none focus:ring-2 focus:ring-[#3B5166] bg-[#F9F8F4]" />
+          </label>
+          <label class="flex flex-col gap-1">
+            <span class="text-[10px] tracking-[0.15em] uppercase font-semibold text-[#7C8B96] font-mono">EXP Date</span>
+            <input id="input-exp" type="date" class="font-mono text-[13px] border border-[#D9D4C6] px-2 py-2 text-[#1F2422] focus:outline-none focus:ring-2 focus:ring-[#3B5166] bg-[#F9F8F4]" />
+          </label>
+        </div>
+        <button id="btn-scan" class="w-full flex items-center justify-center gap-2 font-display text-[12px] tracking-[0.08em] uppercase border border-[#1F2422] text-[#1F2422] py-2 mb-3">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 8V5a1 1 0 011-1h3"/><path d="M20 8V5a1 1 0 00-1-1h-3"/><path d="M4 16v3a1 1 0 001 1h3"/><path d="M20 16v3a1 1 0 01-1 1h-3"/><line x1="4" y1="12" x2="20" y2="12"/></svg>
+          Scan Barcode / QR
+        </button>
+        <button id="btn-calculate" class="w-full font-display text-[13px] tracking-[0.1em] uppercase bg-[#1F2422] text-[#EAE6DA] py-2.5">Calculate</button>
+        <p id="calc-error" class="text-[12px] text-[#E03131] mt-3 hidden"></p>
+      </div>
+      <div id="calc-result"></div>
+      <p id="calc-hint" class="text-[11.5px] text-[#7C8B96] text-center mt-6 px-4 no-print">Enter a manufacture and expiry date, then press Calculate to generate the batch's action report.</p>
+      <p class="font-mono text-[9.5px] text-[#A8A296] text-center mt-6 tracking-wide no-print">SELL-BEFORE RULE — 3 DAYS BUFFER PER POLICY MONTH (1–30 DAYS = 1 MO, 31–60 = 2 MO...)</p>
+    </div>
+
+    <!-- History panel -->
+    <div id="hist-panel" class="hidden no-print">
+      <div class="flex gap-2 mb-3">
+        <div class="flex-1 flex items-center gap-2 bg-white border border-[#D9D4C6] px-3 py-2">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#7C8B96" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.6" y2="16.6"/></svg>
+          <input id="input-search" type="text" placeholder="Search by name or date…" class="text-[13px] text-[#1F2422] focus:outline-none w-full bg-transparent" />
+        </div>
+        <button id="btn-export-all" class="flex items-center justify-center gap-1.5 text-[11.5px] border border-[#D9D4C6] bg-white text-[#3B5166] px-3 py-2">Export All</button>
+      </div>
+      <div id="hist-list"></div>
+    </div>
+
+  </div>
+</div>
+<div id="scanner-root"></div>
+
+<script>
+"use strict";
+
+// ---- Design tokens ----
+var STATUS = {
+  fresh:          { label: "Fresh",                dot: "#2F9E44", bg: "#EAF6EC" },
+  good:           { label: "Good",                 dot: "#37B24D", bg: "#EDF8EE" },
+  monitor:        { label: "Monitor",               dot: "#F0B429", bg: "#FDF6E3" },
+  floor:          { label: "Move to Floor",         dot: "#E8590C", bg: "#FBEBE2" },
+  critical:       { label: "Critical / Priority Sale", dot: "#E03131", bg: "#FBE4E4" },
+  pastSellBefore: { label: "Past Sell Before Date", dot: "#7A1F3D", bg: "#F3E3EA" },
+  expired:        { label: "Expired",               dot: "#2B2B2B", bg: "#E7E5E1" },
+};
+var RECS = {
+  fresh: "Continue normal sale. No action needed.",
+  good: "Continue normal sale. Check again on next stock round.",
+  monitor: "Monitor closely — prioritize this batch in the next sale cycle.",
+  floor: "Move to shop floor / eye-level display to accelerate sale.",
+  critical: "Urgent clearance. Apply markdown and prioritize immediate sale.",
+  pastSellBefore: "Pull from the sale shelf. Still usable, but past the sell-before window — redirect to staff use, donation, or write-off per policy.",
+  expired: "Remove from shelf immediately. Do not sell or use.",
+};
+
+// ---- Helpers ----
+function fmt(d) {
+  if (!d) return "—";
+  return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+}
+function parseDateInput(s) {
+  if (!s) return null;
+  var parts = s.split("-").map(Number);
+  return new Date(parts[0], parts[1] - 1, parts[2]);
+}
+function daysBetween(a, b) {
+  var MS = 24 * 60 * 60 * 1000;
+  var A = new Date(a.getFullYear(), a.getMonth(), a.getDate());
+  var B = new Date(b.getFullYear(), b.getMonth(), b.getDate());
+  return Math.round((B - A) / MS);
+}
+function addDays(d, n) { var r = new Date(d); r.setDate(r.getDate() + n); return r; }
+function clampPercent(p) { if (p > 100) return 100; if (p < 0) return 0; return p; }
+function statusKeyForPercent(pct, isExpired) {
+  if (isExpired) return "expired";
+  if (pct <= 0) return "pastSellBefore";
+  if (pct <= 19) return "critical";
+  if (pct <= 39) return "floor";
+  if (pct <= 59) return "monitor";
+  if (pct <= 79) return "good";
+  return "fresh";
+}
+function computeResult(mfg, exp, today) {
+  var totalShelfLifeDays = daysBetween(mfg, exp);
+  var policyMonths = Math.ceil(totalShelfLifeDays / 30);
+  var subtractDays = policyMonths * 3;
+  var sellBeforeDate = addDays(exp, -subtractDays);
+  var daysToExpiry = daysBetween(today, exp);
+  var daysLeftToSell = daysBetween(today, sellBeforeDate);
+  var totalSellableLife = daysBetween(mfg, sellBeforeDate);
+  var rawPercent = totalSellableLife > 0 ? (daysLeftToSell / totalSellableLife) * 100 : 0;
+  var shelfLifePercent = clampPercent(rawPercent);
+  var roundedPercent = Math.round(shelfLifePercent);
+  var isExpired = daysToExpiry < 0;
+  var statusKey = statusKeyForPercent(roundedPercent, isExpired);
+  return { mfg: mfg, exp: exp, today: today, totalShelfLifeDays: totalShelfLifeDays, policyMonths: policyMonths,
+    subtractDays: subtractDays, sellBeforeDate: sellBeforeDate, daysToExpiry: daysToExpiry,
+    daysLeftToSell: daysLeftToSell, shelfLifePercent: shelfLifePercent, statusKey: statusKey };
+}
+
+// ---- Storage ----
+function loadEntries() {
+  try { var raw = localStorage.getItem("shelf-life-entries"); return raw ? JSON.parse(raw) : []; }
+  catch (e) { return []; }
+}
+function persistEntries(arr) {
+  try { localStorage.setItem("shelf-life-entries", JSON.stringify(arr)); } catch (e) {}
+}
+
+// ---- State ----
+var state = { tab: "calculate", result: null, entries: loadEntries(), search: "" };
+
+// ---- Gauge SVG ----
+function gaugeSvg(percent, color) {
+  var clamped = Math.max(0, Math.min(100, percent));
+  var r = 78, cx = 90, cy = 90;
+  var circumference = Math.PI * r;
+  var dash = (clamped / 100) * circumference;
+  var angle = 180 - (clamped / 100) * 180;
+  var rad = (angle * Math.PI) / 180;
+  var nx = cx + (r - 14) * Math.cos(rad);
+  var ny = cy - (r - 14) * Math.sin(rad);
+  return '<svg width="180" height="112" viewBox="0 0 180 112">' +
+    '<path d="M ' + (cx - r) + ' ' + cy + ' A ' + r + ' ' + r + ' 0 0 1 ' + (cx + r) + ' ' + cy + '" fill="none" stroke="#D9D4C6" stroke-width="14" stroke-linecap="round"/>' +
+    '<path d="M ' + (cx - r) + ' ' + cy + ' A ' + r + ' ' + r + ' 0 0 1 ' + (cx + r) + ' ' + cy + '" fill="none" stroke="' + color + '" stroke-width="14" stroke-linecap="round" stroke-dasharray="' + dash + ' ' + circumference + '"/>' +
+    '<line x1="' + cx + '" y1="' + cy + '" x2="' + nx + '" y2="' + ny + '" stroke="#1F2422" stroke-width="2.5" stroke-linecap="round"/>' +
+    '<circle cx="' + cx + '" cy="' + cy + '" r="4.5" fill="#1F2422"/></svg>';
+}
+
+function row(label, value, strong) {
+  return '<div class="row"><span class="text-[13px] text-[#5B6660]">' + label + '</span>' +
+    '<span class="font-mono ' + (strong ? "text-[15px] font-semibold" : "text-[13.5px]") + ' text-[#1F2422] text-right">' + value + '</span></div>';
+}
+
+// ---- Render: Calculate result ----
+function renderResult() {
+  var container = document.getElementById("calc-result");
+  var hint = document.getElementById("calc-hint");
+  if (!state.result) { container.innerHTML = ""; hint.classList.remove("hidden"); return; }
+  hint.classList.add("hidden");
+  var r = state.result;
+  var s = STATUS[r.statusKey];
+  var name = document.getElementById("input-name").value.trim();
+
+  var html = '';
+  html += '<div class="flex gap-2 mb-3 no-print">';
+  html += '<button id="btn-export-excel" class="flex-1 text-[11.5px] border border-[#D9D4C6] bg-white text-[#3B5166] py-2">⬇ Excel</button>';
+  html += '<button id="btn-export-pdf" class="flex-1 text-[11.5px] border border-[#D9D4C6] bg-white text-[#3B5166] py-2">⎙ PDF</button>';
+  html += '</div>';
+  html += '<div class="border border-[#D9D4C6]">';
+
+  html += '<div class="bg-[#F2EFE6] px-5 pt-4 pb-5"><span class="text-[10px] tracking-[0.22em] font-semibold text-[#7C8B96] uppercase font-mono">Product Info</span>';
+  if (name) html += row("Product", name, true);
+  html += row("MFG Date", fmt(r.mfg));
+  html += row("EXP Date", fmt(r.exp));
+  html += row("Total Shelf Life", r.totalShelfLifeDays + " days (" + r.policyMonths + "-month policy)");
+  html += '</div>';
+
+  html += '<div class="perf">' + '<span class="dot"></span>'.repeat(40) + '</div>';
+
+  html += '<div class="bg-[#F2EFE6] px-5 pt-4 pb-5"><span class="text-[10px] tracking-[0.22em] font-semibold text-[#7C8B96] uppercase font-mono">Current Status</span>';
+  html += row("Today's Date", fmt(r.today));
+  html += row("Days to Expiry", r.daysToExpiry >= 0 ? (r.daysToExpiry + " days") : ("Expired " + Math.abs(r.daysToExpiry) + " days ago"), true);
+  html += '</div>';
+
+  html += '<div class="perf">' + '<span class="dot"></span>'.repeat(40) + '</div>';
+
+  html += '<div class="bg-[#F2EFE6] px-5 pt-4 pb-5"><span class="text-[10px] tracking-[0.22em] font-semibold text-[#7C8B96] uppercase font-mono">Action Required</span>';
+  html += row("Sell Before Date", fmt(r.sellBeforeDate));
+  html += row("Days Left to Sell", r.daysLeftToSell >= 0 ? (r.daysLeftToSell + " days") : ("Overdue " + Math.abs(r.daysLeftToSell) + " days"), true);
+  html += '<div class="flex flex-col items-center pt-3 pb-1">' + gaugeSvg(r.shelfLifePercent, s.dot) +
+    '<div class="text-center -mt-2"><span class="font-mono text-[26px] font-semibold text-[#1F2422]">' + r.shelfLifePercent.toFixed(0) + '%</span>' +
+    '<p class="text-[10px] tracking-[0.15em] uppercase text-[#7C8B96] mt-0.5">Sellable Life Remaining</p></div></div>';
+  html += '<div class="flex items-center gap-2 mt-3 mb-3 px-3 py-2" style="background:' + s.bg + '">' +
+    '<span class="w-2.5 h-2.5 rounded-full" style="background:' + s.dot + '"></span>' +
+    '<span class="font-display text-[13px] text-[#1F2422] uppercase tracking-wide">' + s.label + '</span></div>';
+  html += '<p class="text-[12.5px] text-[#3B5166] leading-snug">' + RECS[r.statusKey] + '</p>';
+  html += '</div></div>';
+
+  container.innerHTML = html;
+  document.getElementById("btn-export-excel").addEventListener("click", exportResultToExcel);
+  document.getElementById("btn-export-pdf").addEventListener("click", function () { window.print(); });
+}
+
+// ---- Render: History list ----
+function renderHistoryList() {
+  document.getElementById("hist-count").textContent = state.entries.length > 0 ? "(" + state.entries.length + ")" : "";
+  var q = state.search.trim().toLowerCase();
+  var filtered = state.entries.filter(function (e) {
+    if (!q) return true;
+    return e.name.toLowerCase().indexOf(q) !== -1 || e.mfg.indexOf(q) !== -1 || e.exp.indexOf(q) !== -1;
+  });
+  var listEl = document.getElementById("hist-list");
+  if (filtered.length === 0) {
+    listEl.innerHTML = '<p class="text-[12px] text-[#7C8B96] text-center mt-8 px-4">' +
+      (state.entries.length === 0 ? "No saved batches yet. Calculations are saved here automatically." : "No entries match your search.") + '</p>';
+    return;
+  }
+  var html = '<div class="flex flex-col gap-2">';
+  filtered.forEach(function (entry) {
+    var r = computeResult(parseDateInput(entry.mfg), parseDateInput(entry.exp), new Date());
+    var s = STATUS[r.statusKey];
+    html += '<div class="bg-[#F2EFE6] border border-[#D9D4C6] px-4 py-3">' +
+      '<div class="flex items-start justify-between gap-2">' +
+      '<button data-open="' + entry.id + '" class="text-left flex-1 min-w-0">' +
+      '<p class="font-semibold text-[13px] text-[#1F2422] truncate">' + entry.name + '</p>' +
+      '<p class="font-mono text-[11px] text-[#5B6660] mt-0.5">' + fmt(parseDateInput(entry.mfg)) + ' → ' + fmt(parseDateInput(entry.exp)) + '</p>' +
+      '<div class="flex items-center gap-2 mt-2">' +
+      '<span class="w-2 h-2 rounded-full" style="background:' + s.dot + '"></span>' +
+      '<span class="font-display text-[10.5px] uppercase tracking-wide text-[#1F2422]">' + s.label + '</span>' +
+      '<span class="font-mono text-[10.5px] text-[#7C8B96]">· ' + r.shelfLifePercent.toFixed(0) + '%</span>' +
+      '</div></button>' +
+      '<button data-delete="' + entry.id + '" class="text-[#A8A296] p-1">✕</button>' +
+      '</div></div>';
+  });
+  html += '</div>';
+  listEl.innerHTML = html;
+
+  listEl.querySelectorAll("[data-open]").forEach(function (btn) {
+    btn.addEventListener("click", function () { openEntry(btn.getAttribute("data-open")); });
+  });
+  listEl.querySelectorAll("[data-delete]").forEach(function (btn) {
+    btn.addEventListener("click", function () { deleteEntry(btn.getAttribute("data-delete")); });
+  });
+}
+
+function saveEntry(name, mfg, exp) {
+  var last = state.entries[0];
+  var finalName = name || "Unnamed batch";
+  if (last && last.name === finalName && last.mfg === mfg && last.exp === exp) return;
+  var entry = { id: Date.now() + "-" + Math.random().toString(36).slice(2, 8), name: finalName, mfg: mfg, exp: exp, savedAt: new Date().toISOString() };
+  state.entries.unshift(entry);
+  persistEntries(state.entries);
+  renderHistoryList();
+}
+function deleteEntry(id) {
+  state.entries = state.entries.filter(function (e) { return e.id !== id; });
+  persistEntries(state.entries);
+  renderHistoryList();
+}
+function openEntry(id) {
+  var entry = state.entries.filter(function (e) { return e.id === id; })[0];
+  if (!entry) return;
+  document.getElementById("input-name").value = entry.name === "Unnamed batch" ? "" : entry.name;
+  document.getElementById("input-mfg").value = entry.mfg;
+  document.getElementById("input-exp").value = entry.exp;
+  state.result = computeResult(parseDateInput(entry.mfg), parseDateInput(entry.exp), new Date());
+  renderResult();
+  switchTab("calculate");
+}
+
+function handleCalculate() {
+  var errEl = document.getElementById("calc-error");
+  errEl.classList.add("hidden");
+  var mfgVal = document.getElementById("input-mfg").value;
+  var expVal = document.getElementById("input-exp").value;
+  if (!mfgVal || !expVal) { errEl.textContent = "Select both a manufacture date and an expiry date."; errEl.classList.remove("hidden"); return; }
+  var mfg = parseDateInput(mfgVal), exp = parseDateInput(expVal);
+  if (exp <= mfg) { errEl.textContent = "Expiry date must be after the manufacture date."; errEl.classList.remove("hidden"); return; }
+  state.result = computeResult(mfg, exp, new Date());
+  renderResult();
+  saveEntry(document.getElementById("input-name").value.trim(), mfgVal, expVal);
+}
+
+function exportResultToExcel() {
+  if (!state.result) return;
+  var r = state.result;
+  var name = document.getElementById("input-name").value.trim() || "Unnamed batch";
+  var row = {
+    "Product": name, "MFG Date": fmt(r.mfg), "EXP Date": fmt(r.exp),
+    "Total Shelf Life (days)": r.totalShelfLifeDays, "Policy Months": r.policyMonths, "Buffer (days)": r.subtractDays,
+    "Sell Before Date": fmt(r.sellBeforeDate), "Today": fmt(r.today), "Days to Expiry": r.daysToExpiry,
+    "Days Left to Sell": r.daysLeftToSell, "Shelf Life %": r.shelfLifePercent.toFixed(0) + "%",
+    "Status": STATUS[r.statusKey].label, "Recommendation": RECS[r.statusKey],
+  };
+  var ws = XLSX.utils.json_to_sheet([row]);
+  var wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Batch");
+  XLSX.writeFile(wb, "shelf-life-" + name.replace(/\s+/g, "_") + ".xlsx");
+}
+function exportHistoryToExcel() {
+  if (state.entries.length === 0) return;
+  var rows = state.entries.map(function (e) {
+    var r = computeResult(parseDateInput(e.mfg), parseDateInput(e.exp), new Date());
+    return { "Product": e.name, "MFG Date": fmt(r.mfg), "EXP Date": fmt(r.exp), "Total Shelf Life (days)": r.totalShelfLifeDays,
+      "Sell Before Date": fmt(r.sellBeforeDate), "Days Left to Sell": r.daysLeftToSell, "Shelf Life %": r.shelfLifePercent.toFixed(0) + "%",
+      "Status": STATUS[r.statusKey].label, "Saved At": new Date(e.savedAt).toLocaleString("en-GB") };
+  });
+  var ws = XLSX.utils.json_to_sheet(rows);
+  var wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "History");
+  XLSX.writeFile(wb, "shelf-life-history.xlsx");
+}
+
+// ---- Tabs ----
+function switchTab(tab) {
+  state.tab = tab;
+  var calcBtn = document.getElementById("tab-calc-btn"), histBtn = document.getElementById("tab-hist-btn");
+  var calcPanel = document.getElementById("calc-panel"), histPanel = document.getElementById("hist-panel");
+  if (tab === "calculate") {
+    calcPanel.classList.remove("hidden"); histPanel.classList.add("hidden");
+    calcBtn.className = "flex-1 py-2.5 font-display text-[12px] uppercase tracking-wide bg-[#1F2422] text-[#EAE6DA]";
+    histBtn.className = "flex-1 py-2.5 font-display text-[12px] uppercase tracking-wide border-l border-[#1F2422] text-[#1F2422]";
+  } else {
+    histPanel.classList.remove("hidden"); calcPanel.classList.add("hidden");
+    histBtn.className = "flex-1 py-2.5 font-display text-[12px] uppercase tracking-wide border-l border-[#1F2422] bg-[#1F2422] text-[#EAE6DA]";
+    calcBtn.className = "flex-1 py-2.5 font-display text-[12px] uppercase tracking-wide text-[#1F2422]";
+  }
+}
+
+// ---- Barcode scanner ----
+function openScanner() {
+  var root = document.getElementById("scanner-root");
+  root.innerHTML =
+    '<div class="fixed inset-0 z-50 flex items-center justify-center p-4" style="background:rgba(0,0,0,0.7)">' +
+    '<div class="bg-[#F2EFE6] border border-[#D9D4C6] w-full max-w-[380px] p-4">' +
+    '<div class="flex items-center justify-between mb-3">' +
+    '<span class="font-display text-[13px] uppercase tracking-wide text-[#1F2422]">Scan Barcode / QR</span>' +
+    '<button id="scanner-close" class="text-[#5B6660] text-[18px]">✕</button></div>' +
+    '<div id="scanner-video-wrap" class="relative bg-black" style="aspect-ratio:1/1;overflow:hidden">' +
+    '<video id="scanner-video" class="w-full h-full" style="object-fit:cover" muted playsinline></video>' +
+    '<p id="scanner-status" class="absolute inset-0 flex items-center justify-center text-white text-[12px]">Starting camera…</p>' +
+    '</div>' +
+    '<p class="text-[11px] text-[#7C8B96] mt-3">Point the camera at a code like <span class="font-mono">NAME:Milk 1L;MFG:2026-07-08;EXP:2026-07-31</span>. Plain text codes fill in the product name only.</p>' +
+    '</div></div>';
+  document.getElementById("scanner-close").addEventListener("click", closeScanner);
+
+  var loadZXing = function () {
+    return new Promise(function (resolve, reject) {
+      if (window.ZXing) return resolve(window.ZXing);
+      var script = document.createElement("script");
+      script.src = "https://unpkg.com/@zxing/library@0.21.3/umd/index.min.js";
+      script.onload = function () { resolve(window.ZXing); };
+      script.onerror = reject;
+      document.body.appendChild(script);
+    });
+  };
+
+  loadZXing().then(function (ZXing) {
+    var reader = new ZXing.BrowserMultiFormatReader();
+    window._scannerReader = reader;
+    var statusEl = document.getElementById("scanner-status");
+    if (statusEl) statusEl.remove();
+    reader.decodeFromVideoDevice(null, "scanner-video", function (result) {
+      if (result) { handleScanDetect(result.getText()); }
+    });
+  }).catch(function () {
+    var wrap = document.getElementById("scanner-video-wrap");
+    if (wrap) wrap.innerHTML = '<div class="flex flex-col items-center justify-center h-full text-center px-6"><p class="text-[12.5px] text-[#5B6660]">Couldn\'t start the scanner (camera permission, or connection issue). Enter details manually instead.</p></div>';
+  });
+}
+function closeScanner() {
+  if (window._scannerReader) { try { window._scannerReader.reset(); } catch (e) {} window._scannerReader = null; }
+  document.getElementById("scanner-root").innerHTML = "";
+}
+function handleScanDetect(text) {
+  closeScanner();
+  var parts = {};
+  text.split(";").forEach(function (chunk) {
+    var idx = chunk.indexOf(":");
+    if (idx > -1) parts[chunk.slice(0, idx).trim().toUpperCase()] = chunk.slice(idx + 1).trim();
+  });
+  if (parts.NAME) document.getElementById("input-name").value = parts.NAME;
+  if (parts.MFG && /^\d{4}-\d{2}-\d{2}$/.test(parts.MFG)) document.getElementById("input-mfg").value = parts.MFG;
+  if (parts.EXP && /^\d{4}-\d{2}-\d{2}$/.test(parts.EXP)) document.getElementById("input-exp").value = parts.EXP;
+  if (!parts.NAME && !parts.MFG && !parts.EXP) document.getElementById("input-name").value = text.trim();
+}
+
+// ---- Wire up events ----
+document.getElementById("tab-calc-btn").addEventListener("click", function () { switchTab("calculate"); });
+document.getElementById("tab-hist-btn").addEventListener("click", function () { switchTab("history"); });
+document.getElementById("btn-calculate").addEventListener("click", handleCalculate);
+document.getElementById("btn-scan").addEventListener("click", openScanner);
+document.getElementById("btn-export-all").addEventListener("click", exportHistoryToExcel);
+document.getElementById("input-search").addEventListener("input", function (e) { state.search = e.target.value; renderHistoryList(); });
+
+renderHistoryList();
+</script>
+</body>
+</html>
