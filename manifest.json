@@ -1,0 +1,16 @@
+{
+  "name": "Shelf Life Pro",
+  "short_name": "Shelf Life",
+  "description": "Batch freshness & clearance tracker",
+  "start_url": "https://vv0121318-source.github.io/shelf-life-app/",
+  "scope": "https://vv0121318-source.github.io/shelf-life-app/",
+  "id": "https://vv0121318-source.github.io/shelf-life-app/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#EAE6DA",
+  "theme_color": "#1F2422",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
